@@ -1,0 +1,27 @@
+name: Confirm Actions
+
+on:
+  push:
+    branches:
+      - preview/l4-neutral-screenshot-20260818
+    paths:
+      - .github/workflows/confirm-actions.yml
+
+permissions:
+  contents: write
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview/l4-neutral-screenshot-20260818
+      - run: |
+          mkdir -p artifacts
+          printf 'GitHub Actions started at %s\n' "$(date -u +%FT%TZ)" > artifacts/actions-started.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -f artifacts/actions-started.txt
+          git commit -m "chore: confirm preview workflow [skip ci]"
+          git push origin HEAD:preview/l4-neutral-screenshot-20260818
