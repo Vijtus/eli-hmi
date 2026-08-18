@@ -1,0 +1,48 @@
+name: Split L4 preview into small chunks
+
+on:
+  push:
+    branches:
+      - preview/l4-neutral-screenshot-20260818
+    paths:
+      - .github/workflows/split-l4-preview-small.yml
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIEW_BRANCH: preview/l4-neutral-screenshot-20260818
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview/l4-neutral-screenshot-20260818
+      - name: Publish small base64 chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            'https://raw.githubusercontent.com/Vijtus/eli-hmi/preview/l4-neutral-screenshot-20260818/artifacts/l4-neutral-preview-auth.png' \
+            -o /tmp/shot.png
+          base64 -w0 /tmp/shot.png > /tmp/shot.b64
+          mkdir -p /tmp/small
+          split -b 8000 -d -a 2 --additional-suffix=.txt /tmp/shot.b64 /tmp/small/part-
+          for f in /tmp/small/part-*.txt; do
+            n=$(basename "$f")
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/small/${n}" \
+              -f message="chore: publish small screenshot chunk ${n} [skip ci]" \
+              -f branch="$PREVIEW_BRANCH" \
+              -f content="$(base64 -w0 "$f")"
+          done
+          {
+            sha256sum /tmp/shot.png
+            stat -c 'bytes=%s' /tmp/shot.png
+            find /tmp/small -type f | wc -l | sed 's/^/parts=/'
+          } > /tmp/small-manifest.txt
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/small/manifest.txt" \
+            -f message='chore: publish small screenshot manifest [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/small-manifest.txt)"
