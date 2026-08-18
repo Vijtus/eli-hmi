@@ -1,0 +1,55 @@
+workflow failed at 2026-08-18T12:23:34Z
+
+NAME                     IMAGE                  COMMAND                  SERVICE        CREATED              STATUS              PORTS
+eli-hmi-frontend-1       eli-hmi-frontend       "docker-entrypoint.s…"   frontend       About a minute ago   Up About a minute   0.0.0.0:8082->8082/tcp, [::]:8082->8082/tcp
+eli-hmi-mock-backend-1   eli-hmi-mock-backend   "go run ."               mock-backend   About a minute ago   Up About a minute   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+
+--- logs ---
+mock-backend-1  | 2026/08/18 12:21:55 Sim gateway listening on :8080
+mock-backend-1  | 
+mock-backend-1  |    ____    __
+mock-backend-1  |   / __/___/ /  ___
+mock-backend-1  |  / _// __/ _ \/ _ \
+mock-backend-1  | /___/\__/_//_/\___/ v4.13.3
+mock-backend-1  | High performance, minimalist Go web framework
+mock-backend-1  | https://echo.labstack.com
+mock-backend-1  | ____________________________________O/_______
+mock-backend-1  |                                     O\
+mock-backend-1  | ⇨ http server started on [::]:8080
+mock-backend-1  | {"time":"2026-08-18T12:21:56.567018338Z","id":"","remote_ip":"172.18.0.1","host":"127.0.0.1:8080","method":"GET","uri":"/","user_agent":"curl/8.5.0","status":200,"error":"","latency":69099,"latency_human":"69.099µs","bytes_in":0,"bytes_out":7760}
+frontend-1      | 
+frontend-1      | > frontend@0.1.0 dev
+frontend-1      | > PORT=8082 next dev --turbopack --hostname 0.0.0.0
+frontend-1      | 
+frontend-1      | ▲ Next.js 16.2.7 (Turbopack)
+frontend-1      | - Local:         http://localhost:8082
+frontend-1      | - Network:       http://0.0.0.0:8082
+frontend-1      | ✓ Ready in 720ms
+frontend-1      | Attention: Next.js now collects completely anonymous telemetry regarding usage.
+frontend-1      | This information is used to shape Next.js' roadmap and prioritize features.
+frontend-1      | You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+frontend-1      | https://nextjs.org/telemetry
+frontend-1      | 
+frontend-1      | [zone-config] zone "test" OK (/app/zone-config): 1 route(s), 1 nav item(s), module config(s): l4-opcpa=modules/l4-opcpa/lasers.yaml, p3=modules/p3/config.yaml, l3bt=modules/l3bt/config.yaml, l4fbt=modules/l4fbt/config.yaml
+frontend-1      | 
+frontend-1      | ○ Compiling /auth/signin ...
+frontend-1      |  GET /auth/signin 200 in 4.7s (next.js: 3.8s, proxy.ts: 404ms, application-code: 436ms)
+frontend-1      |  GET /auth/signin 200 in 289ms (next.js: 35ms, proxy.ts: 40ms, application-code: 214ms)
+frontend-1      |  GET /auth/signin 200 in 81ms (next.js: 4ms, proxy.ts: 6ms, application-code: 71ms)
+frontend-1      |  GET /auth/signin 200 in 65ms (next.js: 3ms, proxy.ts: 4ms, application-code: 58ms)
+frontend-1      |  GET /auth/signin 200 in 60ms (next.js: 3ms, proxy.ts: 5ms, application-code: 53ms)
+frontend-1      |  GET /auth/signin 200 in 92ms (next.js: 3ms, proxy.ts: 5ms, application-code: 84ms)
+frontend-1      | ⚠ Blocked cross-origin request to Next.js dev resource /_next/webpack-hmr from "127.0.0.1".
+frontend-1      | Cross-origin access to Next.js dev resources is blocked by default for safety.
+frontend-1      | 
+frontend-1      | To allow this host in development, add it to "allowedDevOrigins" in next.config.js and restart the dev server:
+frontend-1      | 
+frontend-1      | // next.config.js
+frontend-1      | module.exports = {
+frontend-1      |   allowedDevOrigins: ['127.0.0.1'],
+frontend-1      | }
+frontend-1      | 
+frontend-1      | Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+frontend-1      |  GET /auth/signin?username=test&password=test 200 in 54ms (next.js: 2ms, proxy.ts: 5ms, application-code: 47ms)
+frontend-1      |  GET /auth/signin 200 in 50ms (next.js: 2ms, proxy.ts: 2ms, application-code: 46ms)
+frontend-1      |  GET /auth/signin 200 in 59ms (next.js: 3ms, proxy.ts: 5ms, application-code: 51ms)
