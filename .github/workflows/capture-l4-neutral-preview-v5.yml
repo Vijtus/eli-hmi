@@ -1,0 +1,148 @@
+name: Capture L4 neutral-color preview v5
+
+on:
+  push:
+    branches:
+      - preview/l4-neutral-screenshot-20260818
+    paths:
+      - .github/workflows/capture-l4-neutral-preview-v5.yml
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIEW_BRANCH: preview/l4-neutral-screenshot-20260818
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview/l4-neutral-screenshot-20260818
+
+      - name: Apply preview changes
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/apply-neutral-preview.py
+          git diff --check
+
+      - name: Start application
+        run: |
+          set -euo pipefail
+          docker compose up -d --build
+          for i in $(seq 1 150); do
+            if curl -fsS http://localhost:8082/auth/signin >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs --no-color
+          exit 1
+
+      - name: Install Playwright
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/l4-capture
+          cd /tmp/l4-capture
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+
+      - name: Authenticate, capture, and publish screenshot
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > /tmp/l4-capture/capture.mjs <<'JS'
+          import { chromium } from 'playwright'
+
+          const base = 'http://localhost:8082'
+          const browser = await chromium.launch({ headless: true })
+          const context = await browser.newContext({
+            viewport: { width: 1600, height: 1000 },
+            deviceScaleFactor: 1,
+          })
+          const page = await context.newPage()
+
+          const providersResponse = await context.request.get(`${base}/api/auth/providers`)
+          const providersText = await providersResponse.text()
+          console.log('providers', providersResponse.status(), providersText)
+          if (!providersResponse.ok()) throw new Error('Could not load auth providers')
+          const providers = JSON.parse(providersText)
+          const providerId = Object.keys(providers)[0]
+          if (!providerId) throw new Error('No auth provider found')
+
+          const csrfResponse = await context.request.get(`${base}/api/auth/csrf`)
+          const csrfText = await csrfResponse.text()
+          console.log('csrf', csrfResponse.status(), csrfText)
+          if (!csrfResponse.ok()) throw new Error('Could not load CSRF token')
+          const { csrfToken } = JSON.parse(csrfText)
+
+          const authResponse = await context.request.post(
+            `${base}/api/auth/callback/${encodeURIComponent(providerId)}`,
+            {
+              form: {
+                csrfToken,
+                username: 'test',
+                password: 'test',
+                callbackUrl: `${base}/l4-opcpa`,
+                json: 'true',
+              },
+            },
+          )
+          const authText = await authResponse.text()
+          console.log('auth', authResponse.status(), authText)
+          if (!authResponse.ok()) throw new Error('Credentials callback failed')
+
+          const sessionResponse = await context.request.get(`${base}/api/auth/session`)
+          const sessionText = await sessionResponse.text()
+          console.log('session', sessionResponse.status(), sessionText)
+          if (!sessionText.includes('accessToken')) {
+            throw new Error('Authenticated session was not created')
+          }
+
+          await page.goto(`${base}/l4-opcpa`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          })
+          await page.getByText('NL2', { exact: true }).waitFor({ timeout: 60_000 })
+          await page.getByText('is CLOSED', { exact: true }).waitFor({ timeout: 60_000 })
+          await page.waitForTimeout(3_000)
+
+          await page.screenshot({
+            path: process.cwd() + '/artifacts/l4-neutral-preview-auth.png',
+            fullPage: true,
+          })
+          await browser.close()
+          JS
+
+          node /tmp/l4-capture/capture.mjs 2>&1 | tee /tmp/v5-capture.log
+
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/l4-neutral-preview-auth.png" \
+            -f message='chore: publish authenticated L4 neutral-color screenshot [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 artifacts/l4-neutral-preview-auth.png)"
+
+      - name: Publish diagnostics on failure
+        if: failure()
+        run: |
+          set +e
+          {
+            printf 'workflow failed at %s\n\n' "$(date -u +%FT%TZ)"
+            if [ -f /tmp/v5-capture.log ]; then
+              printf '%s\n' '--- capture ---'
+              cat /tmp/v5-capture.log
+            fi
+            printf '%s\n' '--- compose status ---'
+            docker compose ps 2>&1
+            printf '%s\n' '--- compose logs ---'
+            docker compose logs --no-color 2>&1
+          } > /tmp/v5-failure.log
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/v5-failure.log" \
+            -f message='chore: publish authenticated screenshot diagnostics [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/v5-failure.log)" || true
