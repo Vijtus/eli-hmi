@@ -1,0 +1,60 @@
+workflow failed at 2026-08-18T12:27:59Z
+
+--- capture ---
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+locator.waitFor: Timeout 60000ms exceeded.
+Call log:
+  - waiting for getByText('NL2', { exact: true }) to be visible
+
+    at /tmp/l4-capture/capture.mjs:25:46 {
+  name: 'TimeoutError'
+}
+
+Node.js v22.23.2
+--- compose status ---
+NAME                     IMAGE                  COMMAND                  SERVICE        CREATED              STATUS              PORTS
+eli-hmi-frontend-1       eli-hmi-frontend       "docker-entrypoint.s…"   frontend       About a minute ago   Up About a minute   0.0.0.0:8082->8082/tcp, [::]:8082->8082/tcp
+eli-hmi-mock-backend-1   eli-hmi-mock-backend   "go run ."               mock-backend   About a minute ago   Up About a minute   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+--- compose logs ---
+mock-backend-1  | 2026/08/18 12:26:33 Sim gateway listening on :8080
+mock-backend-1  | 
+mock-backend-1  |    ____    __
+mock-backend-1  |   / __/___/ /  ___
+mock-backend-1  |  / _// __/ _ \/ _ \
+mock-backend-1  | /___/\__/_//_/\___/ v4.13.3
+mock-backend-1  | High performance, minimalist Go web framework
+mock-backend-1  | https://echo.labstack.com
+mock-backend-1  | ____________________________________O/_______
+mock-backend-1  |                                     O\
+mock-backend-1  | ⇨ http server started on [::]:8080
+mock-backend-1  | {"time":"2026-08-18T12:26:34.231000529Z","id":"","remote_ip":"172.18.0.1","host":"localhost:8080","method":"GET","uri":"/","user_agent":"curl/8.5.0","status":200,"error":"","latency":213834,"latency_human":"213.834µs","bytes_in":0,"bytes_out":7760}
+frontend-1      | 
+frontend-1      | > frontend@0.1.0 dev
+frontend-1      | > PORT=8082 next dev --turbopack --hostname 0.0.0.0
+frontend-1      | 
+frontend-1      | ▲ Next.js 16.2.7 (Turbopack)
+frontend-1      | - Local:         http://localhost:8082
+frontend-1      | - Network:       http://0.0.0.0:8082
+frontend-1      | ✓ Ready in 748ms
+frontend-1      | Attention: Next.js now collects completely anonymous telemetry regarding usage.
+frontend-1      | This information is used to shape Next.js' roadmap and prioritize features.
+frontend-1      | You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+frontend-1      | https://nextjs.org/telemetry
+frontend-1      | 
+frontend-1      | [zone-config] zone "test" OK (/app/zone-config): 1 route(s), 1 nav item(s), module config(s): l4-opcpa=modules/l4-opcpa/lasers.yaml, p3=modules/p3/config.yaml, l3bt=modules/l3bt/config.yaml, l4fbt=modules/l4fbt/config.yaml
+frontend-1      | 
+frontend-1      | ○ Compiling /auth/signin ...
+frontend-1      |  GET /auth/signin 200 in 5.3s (next.js: 4.4s, proxy.ts: 435ms, application-code: 438ms)
+frontend-1      |  GET /auth/signin 200 in 202ms (next.js: 30ms, proxy.ts: 57ms, application-code: 115ms)
+frontend-1      |  GET /auth/signin 200 in 83ms (next.js: 4ms, proxy.ts: 7ms, application-code: 73ms)
+frontend-1      |  GET /auth/signin 200 in 108ms (next.js: 5ms, proxy.ts: 6ms, application-code: 96ms)
+frontend-1      |  GET /auth/signin 200 in 66ms (next.js: 3ms, proxy.ts: 5ms, application-code: 59ms)
+frontend-1      |  GET /auth/signin 200 in 78ms (next.js: 3ms, proxy.ts: 6ms, application-code: 69ms)
+frontend-1      |  GET /api/runtime-config 200 in 1361ms (next.js: 1315ms, application-code: 46ms)
+frontend-1      |  GET /api/auth/session 200 in 1961ms (next.js: 1942ms, application-code: 19ms)
+frontend-1      |  GET /auth/signin 200 in 69ms (next.js: 4ms, proxy.ts: 3ms, application-code: 62ms)
+frontend-1      |  GET /api/runtime-config 200 in 12ms (next.js: 4ms, application-code: 8ms)
+frontend-1      |  GET /api/auth/session 200 in 18ms (next.js: 10ms, application-code: 8ms)
