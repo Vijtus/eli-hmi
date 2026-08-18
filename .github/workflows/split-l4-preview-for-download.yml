@@ -1,0 +1,56 @@
+name: Split L4 preview for transfer
+
+on:
+  push:
+    branches:
+      - preview/l4-neutral-screenshot-20260818
+    paths:
+      - .github/workflows/split-l4-preview-for-download.yml
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIEW_BRANCH: preview/l4-neutral-screenshot-20260818
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview/l4-neutral-screenshot-20260818
+      - name: Split screenshot into text chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            'https://raw.githubusercontent.com/Vijtus/eli-hmi/preview/l4-neutral-screenshot-20260818/artifacts/l4-neutral-preview-auth.png' \
+            -o /tmp/l4-neutral-preview-auth.png
+          base64 -w0 /tmp/l4-neutral-preview-auth.png > /tmp/screenshot.b64
+          mkdir -p /tmp/chunks
+          split -b 20000 -d -a 2 --additional-suffix=.txt \
+            /tmp/screenshot.b64 /tmp/chunks/chunk-
+
+          for file in /tmp/chunks/chunk-*.txt; do
+            name=$(basename "$file")
+            gh api --method PUT \
+              "repos/${GITHUB_REPOSITORY}/contents/artifacts/base64/${name}" \
+              -f message="chore: publish screenshot transfer ${name} [skip ci]" \
+              -f branch="$PREVIEW_BRANCH" \
+              -f content="$(base64 -w0 "$file")"
+          done
+
+          {
+            printf 'sha256='
+            sha256sum /tmp/l4-neutral-preview-auth.png | awk '{print $1}'
+            printf 'bytes='
+            stat -c '%s' /tmp/l4-neutral-preview-auth.png
+            printf 'chunks='
+            find /tmp/chunks -type f | wc -l
+          } > /tmp/manifest.txt
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/artifacts/base64/manifest.txt" \
+            -f message='chore: publish screenshot transfer manifest [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/manifest.txt)"
