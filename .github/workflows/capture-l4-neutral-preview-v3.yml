@@ -1,0 +1,305 @@
+name: Capture L4 neutral-color preview v3
+
+on:
+  push:
+    branches:
+      - preview/l4-neutral-screenshot-20260818
+    paths:
+      - .github/workflows/capture-l4-neutral-preview-v3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIEW_BRANCH: preview/l4-neutral-screenshot-20260818
+
+    steps:
+      - name: Check out preview branch
+        uses: actions/checkout@v4
+        with:
+          ref: preview/l4-neutral-screenshot-20260818
+
+      - name: Mark workflow start
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'capture workflow started at %s\n' "$(date -u +%FT%TZ)" > /tmp/status.txt
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/v3-01-started.txt" \
+            -f message='chore: mark screenshot workflow start [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/status.txt)"
+
+      - name: Apply neutral-color preview changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text()
+
+          def write(path, text):
+              Path(path).write_text(text)
+
+          def replace_once(path, old, new):
+              text = read(path)
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'anchor missing: {path}')
+              write(path, text.replace(old, new, 1))
+
+          def replace_property(path, selector, old, new):
+              text = read(path)
+              start = text.find(selector)
+              if start < 0:
+                  raise SystemExit(f'selector missing: {path}: {selector}')
+              end = text.find('}', start)
+              if end < 0:
+                  raise SystemExit(f'block missing end: {path}: {selector}')
+              block = text[start:end + 1]
+              if new in block:
+                  return
+              if old not in block:
+                  raise SystemExit(f'property missing: {path}: {selector}')
+              write(path, text[:start] + block.replace(old, new, 1) + text[end + 1:])
+
+          globals_css = 'frontend/src/app/globals.css'
+          replace_once(
+              globals_css,
+              '  --color-nav-background: var(--color-gray-800);\n\n  /* CSI-782',
+              '  --color-nav-background: var(--color-gray-800);\n\n'
+              '  --color-action-neutral: var(--color-surface-lighter);\n'
+              '  --color-action-neutral-hover: var(--color-surface);\n\n'
+              '  /* CSI-782',
+          )
+          replace_once(
+              globals_css,
+              '  --color-surface: var(--color-negative-neutral);\n  --color-border: var(--color-text);',
+              '  --color-surface: var(--color-negative-neutral);\n'
+              '  --color-action-neutral: var(--color-negative-neutral);\n'
+              '  --color-action-neutral-hover: var(--color-positive-neutral);\n'
+              '  --color-border: var(--color-text);',
+          )
+
+          replace_once(
+              'frontend/src/components/hmi/laser-panel/GeneralSection.tsx',
+              '            onTone="negative-neutral"\n            offTone="positive-neutral"',
+              '            onTone="positive-neutral"\n            offTone="negative-neutral"',
+          )
+          replace_once(
+              'frontend/src/components/hmi/laser-panel/RegenSection.tsx',
+              '            onLabel="is ON"\n            offLabel="is OFF"\n          />',
+              '            onLabel="is ON"\n            offLabel="is OFF"\n            offTone="negative-neutral"\n          />',
+          )
+
+          flash_path = 'frontend/src/components/hmi/laser-panel/FlashlampsSection.tsx'
+          flash = read(flash_path)
+          if "'positive-neutral' | 'negative-important'" not in flash:
+              replacement = (
+                  "function toneForState(\n"
+                  "  state: FlashlampState,\n"
+                  "  count: number,\n"
+                  "): 'positive-neutral' | 'negative-important' {\n"
+                  "  if (state === 'FAIL' && count > 0) return 'negative-important'\n"
+                  "  return 'positive-neutral'\n"
+                  "}\n"
+              )
+              flash, count = re.subn(
+                  r"function toneForState\(\n[\s\S]*?\n}\n",
+                  replacement,
+                  flash,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit('toneForState replacement failed')
+              write(flash_path, flash)
+
+          replace_property(
+              'frontend/src/components/hmi/controls/CogToggle.module.css',
+              '.button {',
+              'background: var(--color-surface-lighter);',
+              'background: var(--color-action-neutral);',
+          )
+          replace_property(
+              'frontend/src/components/hmi/controls/CogToggle.module.css',
+              '.button:hover {',
+              'background: var(--color-surface);',
+              'background: var(--color-action-neutral-hover);',
+          )
+
+          action_path = 'frontend/src/components/hmi/controls/ActionButton.module.css'
+          action = read(action_path)
+          action = action.replace(
+              'background: var(--color-surface-lighter);',
+              'background: var(--color-action-neutral);',
+          )
+          action = action.replace(
+              'background: var(--color-surface);',
+              'background: var(--color-action-neutral-hover);',
+          )
+          write(action_path, action)
+
+          preset_path = 'frontend/src/components/hmi/controls/PresetIntegerInput.module.css'
+          for selector in ('.chip {', '.confirm {'):
+              replace_property(
+                  preset_path,
+                  selector,
+                  'background: var(--color-surface-lighter);',
+                  'background: var(--color-action-neutral);',
+              )
+          for selector in ('.chip:hover:not(:disabled) {', '.confirm:hover:not(:disabled) {'):
+              replace_property(
+                  preset_path,
+                  selector,
+                  'background: var(--color-surface);',
+                  'background: var(--color-action-neutral-hover);',
+              )
+
+          waveform_path = 'frontend/src/components/hmi/laser-panel/WaveformSelect.module.css'
+          replace_property(
+              waveform_path,
+              '.load {',
+              'background: var(--color-surface-lighter);',
+              'background: var(--color-action-neutral);',
+          )
+          replace_property(
+              waveform_path,
+              '.load:hover:not(:disabled) {',
+              'background: var(--color-surface);',
+              'background: var(--color-action-neutral-hover);',
+          )
+
+          sections_path = 'frontend/src/components/hmi/laser-panel/sections.module.css'
+          replace_property(
+              sections_path,
+              '.waveformActionToggle {',
+              'background: var(--color-surface-lighter);',
+              'background: var(--color-action-neutral);',
+          )
+          replace_property(
+              sections_path,
+              '.waveformActionToggle:hover {',
+              'background: var(--color-surface);',
+              'background: var(--color-action-neutral-hover);',
+          )
+          sections = read(sections_path)
+          rule = ".flashlampCell[data-tone='positive-neutral'] {\n  background: var(--color-surface-lighter);\n  border-color: var(--color-text);\n}\n\n"
+          marker = ".flashlampCell[data-tone='positive-important'] {"
+          if rule not in sections:
+              if marker not in sections:
+                  raise SystemExit('flashlamp CSS marker missing')
+              write(sections_path, sections.replace(marker, rule + marker, 1))
+          PY
+
+          git diff --check
+          printf 'neutral-color patch applied at %s\n' "$(date -u +%FT%TZ)" > /tmp/status.txt
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/v3-02-patched.txt" \
+            -f message='chore: mark screenshot patch stage [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/status.txt)"
+
+      - name: Build and start app
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose up -d --build
+          for i in $(seq 1 150); do
+            if curl -fsS http://127.0.0.1:8082/auth/signin >/dev/null 2>&1 && \
+               curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              printf 'application ready at %s\n' "$(date -u +%FT%TZ)" > /tmp/status.txt
+              gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/v3-03-app-ready.txt" \
+                -f message='chore: mark screenshot app stage [skip ci]' \
+                -f branch="$PREVIEW_BRANCH" \
+                -f content="$(base64 -w0 /tmp/status.txt)"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs --no-color
+          exit 1
+
+      - name: Install screenshot browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/l4-capture
+          cd /tmp/l4-capture
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.54.2
+          npx playwright install --with-deps chromium
+          printf 'browser installed at %s\n' "$(date -u +%FT%TZ)" > /tmp/status.txt
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/v3-04-browser-ready.txt" \
+            -f message='chore: mark screenshot browser stage [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/status.txt)"
+
+      - name: Take and publish screenshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > /tmp/l4-capture/capture.mjs <<'JS'
+          import { chromium } from 'playwright'
+
+          const browser = await chromium.launch({ headless: true })
+          const page = await browser.newPage({
+            viewport: { width: 1600, height: 1000 },
+            deviceScaleFactor: 1,
+          })
+
+          await page.goto('http://127.0.0.1:8082/l4-opcpa', {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          })
+
+          if (page.url().includes('/auth/signin')) {
+            await page.getByLabel('Username').fill('test')
+            await page.getByLabel('Password').fill('test')
+            await page.getByRole('button', { name: 'Sign In' }).click()
+            await page.waitForTimeout(2_000)
+            await page.goto('http://127.0.0.1:8082/l4-opcpa', {
+              waitUntil: 'domcontentloaded',
+              timeout: 60_000,
+            })
+          }
+
+          await page.getByText('NL2', { exact: true }).waitFor({ timeout: 60_000 })
+          await page.getByText('is CLOSED', { exact: true }).waitFor({ timeout: 60_000 })
+          await page.waitForTimeout(3_000)
+          await page.screenshot({
+            path: process.cwd() + '/artifacts/l4-neutral-preview-v3.png',
+            fullPage: true,
+          })
+          await browser.close()
+          JS
+          node /tmp/l4-capture/capture.mjs
+
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/l4-neutral-preview-v3.png" \
+            -f message='chore: publish L4 neutral-color screenshot [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 artifacts/l4-neutral-preview-v3.png)"
+
+      - name: Publish failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          {
+            printf 'workflow failed at %s\n\n' "$(date -u +%FT%TZ)"
+            docker compose ps 2>&1
+            printf '\n--- logs ---\n'
+            docker compose logs --no-color 2>&1
+          } > /tmp/v3-failure.log
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/artifacts/v3-failure.log" \
+            -f message='chore: publish screenshot failure diagnostics [skip ci]' \
+            -f branch="$PREVIEW_BRANCH" \
+            -f content="$(base64 -w0 /tmp/v3-failure.log)" || true
